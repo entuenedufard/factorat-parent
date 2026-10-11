@@ -4,28 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Veille des parents</title>
+<title>Planning du Factorat</title>
 <style>
   :root {
-    --fond: #f6f1e7;
-    --carte: #fffdf8;
-    --encre: #1f1b16;
-    --doux: #6b6257;
-    --trait: #e2d9c8;
-    --accent: #b4541a;
-    --sur-accent: #fffdf8;
-    --alerte: #9b2c2c;
+    --fond: #f2f6ff;
+    --carte: #ffffff;
+    --encre: #1b1f3b;
+    --doux: #5b6285;
+    --trait: #dbe3f6;
+    --accent: #5b4bff;
+    --alerte: #c2255c;
+    /* une couleur par personne, dans l'ordre de l'onglet Prénoms */
+    --p0: #b9a6ff; --p1: #5fd9c9; --p2: #ffd166; --p3: #ff8fab; --p4: #7cc4ff; --p5: #9be37a;
+    --sur-couleur: #1b1f3b;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --fond: #171411;
-      --carte: #211d18;
-      --encre: #f0e9dd;
-      --doux: #a89e90;
-      --trait: #3a332b;
-      --accent: #e8935a;
-      --sur-accent: #171411;
-      --alerte: #f0a0a0;
+      --fond: #12142b;
+      --carte: #1c1f3f;
+      --encre: #eef0ff;
+      --doux: #a3a9cf;
+      --trait: #2f3462;
+      --accent: #a99bff;
+      --alerte: #ff9dbb;
     }
   }
   * { box-sizing: border-box; }
@@ -37,7 +38,7 @@
   }
   main { max-width: 34rem; margin: 0 auto; padding: 2rem 1rem 6rem; }
   h1 {
-    font: 600 2rem/1.1 "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font: 800 2rem/1.1 ui-rounded, "SF Pro Rounded", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0 0 .25rem;
     text-wrap: balance;
   }
@@ -62,7 +63,11 @@
     text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
   }
   .inscrit { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-top: .35rem; }
-  .nom { font: 600 1.45rem/1.2 "Iowan Old Style", "Palatino Linotype", Georgia, serif; }
+  .nom {
+    font: 700 1.3rem/1.2 ui-rounded, "SF Pro Rounded", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--couleur, var(--trait)); color: var(--sur-couleur);
+    padding: .3rem .9rem; border-radius: 999px;
+  }
   .choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .5rem; margin-top: .6rem; }
   .apres-choix { display: flex; gap: .5rem; margin-top: .5rem; }
   button {
@@ -73,15 +78,23 @@
   }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button:disabled { opacity: .5; cursor: default; }
-  button.prenom { background: var(--fond); font-weight: 600; }
-  button.prenom:hover:not(:disabled), button.prenom.actif {
-    background: var(--accent); border-color: var(--accent); color: var(--sur-accent);
+  button.prenom {
+    font-weight: 700; background: transparent;
+    border: 2px solid var(--couleur, var(--trait));
+  }
+  button.prenom.actif { background: var(--couleur, var(--trait)); color: var(--sur-couleur); }
+  @media (hover: hover) {
+    button.prenom:hover:not(:disabled) { background: var(--couleur, var(--trait)); color: var(--sur-couleur); }
+  }
+  .pastille {
+    background: var(--couleur, var(--trait)); color: var(--sur-couleur);
+    padding: .1rem .7rem; border-radius: 999px; font-weight: 600; font-size: .92rem;
   }
   button.discret { color: var(--doux); font-size: .9rem; }
   details { margin-top: 1.5rem; }
   summary { cursor: pointer; color: var(--doux); padding: .6rem 0; }
   .historique li {
-    display: flex; justify-content: space-between; gap: 1rem;
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem;
     padding: .45rem 0; border-bottom: 1px solid var(--trait);
   }
   .vide, .chargement { color: var(--doux); padding: 1rem 0; }
@@ -99,8 +112,8 @@
 </head>
 <body>
 <main>
-  <h1>Veille des parents</h1>
-  <p class="sous-titre">Qui veille, et quand.</p>
+  <h1>Planning du Factorat</h1>
+  <p class="sous-titre">pour les 10 prochaines semaines</p>
   <div id="demo" class="demo" hidden>Mode démo : l'adresse du script n'est pas encore renseignée, rien n'est enregistré.</div>
   <div id="contenu"><p class="chargement">Chargement…</p></div>
 </main>
@@ -108,7 +121,7 @@
 
 <script>
 // ─── À REMPLIR : l'adresse du script Google (elle finit par /exec) ───
-const API_URL = 'https://script.google.com/macros/s/AKfycbzIMHarffQEKtmvGAoEqmHlDs4pjJzgNJohOQabqFoo145M4uOdCR03SEKSHbsOse7KtA/exec';
+const API_URL = 'COLLER_ICI_L_ADRESSE_DU_SCRIPT';
 // ─────────────────────────────────────────────────────────────────────
 
 const DEMO = !/^https:\/\//.test(API_URL);
@@ -166,7 +179,7 @@ function demo(corps) {
     if (corps.nom) fausses[corps.lundi] = corps.nom; else delete fausses[corps.lundi];
   }
   const semaines = [];
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     const l = ajouterJours(lundi, 7 * i);
     semaines.push({ lundi: l, nom: fausses[l] || null });
   }
@@ -181,6 +194,12 @@ function el(balise, classe, texte) {
   if (classe) e.className = classe;
   if (texte !== undefined) e.textContent = texte;
   return e;
+}
+// Chaque prénom garde sa couleur, selon sa place dans la liste.
+function colorer(element, nom) {
+  const rang = etat.noms.indexOf(nom);
+  if (rang >= 0) element.style.setProperty('--couleur', 'var(--p' + (rang % 6) + ')');
+  return element;
 }
 function bouton(texte, classe, action) {
   const b = el('button', classe, texte);
@@ -199,7 +218,7 @@ function carte(sem, index) {
 
   if (sem.nom && !ouvertes.has(sem.lundi)) {
     const ligne = el('div', 'inscrit');
-    ligne.append(el('span', 'nom', sem.nom));
+    ligne.append(colorer(el('span', 'nom', sem.nom), sem.nom));
     const changer = bouton('Changer', 'discret', () => { ouvertes.add(sem.lundi); rendre(); });
     changer.setAttribute('aria-label', 'Changer la personne pour la semaine ' + libelle(sem.lundi));
     ligne.append(changer);
@@ -212,6 +231,7 @@ function carte(sem, index) {
   choix.setAttribute('aria-label', 'Qui veille la semaine ' + libelle(sem.lundi) + ' ?');
   etat.noms.forEach(nom => {
     const b = bouton(nom, 'prenom' + (nom === sem.nom ? ' actif' : ''), () => inscrire(sem, nom));
+    colorer(b, nom);
     if (nom === sem.nom) b.setAttribute('aria-pressed', 'true');
     choix.append(b);
   });
@@ -242,7 +262,7 @@ function rendre() {
     const passe = el('ul', 'historique');
     etat.historique.forEach(h => {
       const li = el('li');
-      li.append(el('span', 'dates', libelle(h.lundi)), el('span', '', h.nom));
+      li.append(el('span', 'dates', libelle(h.lundi)), colorer(el('span', 'pastille', h.nom), h.nom));
       passe.append(li);
     });
     details.append(passe);
