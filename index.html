@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Veille des parents</title>
+<style>
+  :root {
+    --fond: #f6f1e7;
+    --carte: #fffdf8;
+    --encre: #1f1b16;
+    --doux: #6b6257;
+    --trait: #e2d9c8;
+    --accent: #b4541a;
+    --sur-accent: #fffdf8;
+    --alerte: #9b2c2c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #171411;
+      --carte: #211d18;
+      --encre: #f0e9dd;
+      --doux: #a89e90;
+      --trait: #3a332b;
+      --accent: #e8935a;
+      --sur-accent: #171411;
+      --alerte: #f0a0a0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fond);
+    color: var(--encre);
+    font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 34rem; margin: 0 auto; padding: 2rem 1rem 6rem; }
+  h1 {
+    font: 600 2rem/1.1 "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    margin: 0 0 .25rem;
+    text-wrap: balance;
+  }
+  .sous-titre { color: var(--doux); margin: 0 0 1.5rem; }
+  .demo {
+    border: 1px dashed var(--accent); color: var(--accent);
+    border-radius: 10px; padding: .6rem .8rem; margin-bottom: 1rem; font-size: .9rem;
+  }
+  ul { list-style: none; margin: 0; padding: 0; }
+  .semaine {
+    background: var(--carte);
+    border: 1px solid var(--trait);
+    border-radius: 14px;
+    padding: .9rem 1rem 1rem;
+    margin-bottom: .7rem;
+  }
+  .semaine.courante { border-left: 5px solid var(--accent); }
+  .tete { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+  .dates { color: var(--doux); font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .badge {
+    color: var(--accent); font-size: .75rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
+  }
+  .inscrit { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-top: .35rem; }
+  .nom { font: 600 1.45rem/1.2 "Iowan Old Style", "Palatino Linotype", Georgia, serif; }
+  .choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .5rem; margin-top: .6rem; }
+  .apres-choix { display: flex; gap: .5rem; margin-top: .5rem; }
+  button {
+    font: inherit; color: var(--encre);
+    min-height: 44px; padding: .45rem .9rem;
+    border-radius: 10px; border: 1px solid var(--trait);
+    background: transparent; cursor: pointer;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.prenom { background: var(--fond); font-weight: 600; }
+  button.prenom:hover:not(:disabled), button.prenom.actif {
+    background: var(--accent); border-color: var(--accent); color: var(--sur-accent);
+  }
+  button.discret { color: var(--doux); font-size: .9rem; }
+  details { margin-top: 1.5rem; }
+  summary { cursor: pointer; color: var(--doux); padding: .6rem 0; }
+  .historique li {
+    display: flex; justify-content: space-between; gap: 1rem;
+    padding: .45rem 0; border-bottom: 1px solid var(--trait);
+  }
+  .vide, .chargement { color: var(--doux); padding: 1rem 0; }
+  .erreur { color: var(--alerte); }
+  #annonce {
+    position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
+    max-width: calc(100% - 2rem); width: max-content;
+    background: var(--encre); color: var(--fond);
+    padding: .65rem 1rem; border-radius: 999px; font-size: .92rem;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  #annonce.visible { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #annonce { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Veille des parents</h1>
+  <p class="sous-titre">Qui veille, et quand.</p>
+  <div id="demo" class="demo" hidden>Mode démo : l'adresse du script n'est pas encore renseignée, rien n'est enregistré.</div>
+  <div id="contenu"><p class="chargement">Chargement…</p></div>
+</main>
+<div id="annonce" role="status" aria-live="polite"></div>
+
+<script>
+// ─── À REMPLIR : l'adresse du script Google (elle finit par /exec) ───
+const API_URL = 'https://script.google.com/macros/s/AKfycbzIMHarffQEKtmvGAoEqmHlDs4pjJzgNJohOQabqFoo145M4uOdCR03SEKSHbsOse7KtA/exec';
+// ─────────────────────────────────────────────────────────────────────
+
+const DEMO = !/^https:\/\//.test(API_URL);
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
+  'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+let etat = null;             // { noms, semaines, historique }
+const ouvertes = new Set();  // semaines dont on a cliqué "Changer"
+let occupe = false;
+let historiqueOuvert = false;
+
+/* ---------- Dates ---------- */
+function enDate(iso) {
+  const p = iso.split('-').map(Number);
+  return new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+}
+function ajouterJours(iso, n) {
+  const d = enDate(iso);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function libelle(lundi) {
+  const debut = enDate(lundi);
+  const fin = enDate(ajouterJours(lundi, 6));
+  const memeMois = debut.getUTCMonth() === fin.getUTCMonth();
+  const q = d => d.getUTCDate() === 1 ? '1er' : d.getUTCDate();
+  return 'lun. ' + q(debut) + (memeMois ? '' : ' ' + MOIS[debut.getUTCMonth()])
+    + ' → dim. ' + q(fin) + ' ' + MOIS[fin.getUTCMonth()];
+}
+
+/* ---------- Échanges avec le script ---------- */
+async function api(corps) {
+  if (DEMO) return demo(corps);
+  const options = corps
+    ? { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(corps) }
+    : {};
+  const reponse = await fetch(API_URL + (corps ? '' : '?action=planning'), options);
+  const donnees = await reponse.json();
+  if (donnees.erreur) throw new Error(donnees.erreur);
+  return donnees;
+}
+
+// Fausses données, tant que l'adresse du script n'est pas renseignée.
+const fausses = {};
+function demo(corps) {
+  const maintenant = new Date();
+  const iso = new Date(Date.UTC(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate()))
+    .toISOString().slice(0, 10);
+  const lundi = ajouterJours(iso, -((enDate(iso).getUTCDay() + 6) % 7));
+  const noms = ['Xavier', 'Thierry', 'Dominique', 'Antoine'];
+  if (!Object.keys(fausses).length) {
+    [-3, -2, -1, 0, 1].forEach((i, k) => { fausses[ajouterJours(lundi, 7 * i)] = noms[k % 4]; });
+  }
+  if (corps) {
+    if (corps.nom) fausses[corps.lundi] = corps.nom; else delete fausses[corps.lundi];
+  }
+  const semaines = [];
+  for (let i = 0; i < 8; i++) {
+    const l = ajouterJours(lundi, 7 * i);
+    semaines.push({ lundi: l, nom: fausses[l] || null });
+  }
+  const historique = Object.keys(fausses).filter(l => l < lundi).sort().reverse()
+    .map(l => ({ lundi: l, nom: fausses[l] }));
+  return Promise.resolve({ noms, semaines, historique });
+}
+
+/* ---------- Affichage ---------- */
+function el(balise, classe, texte) {
+  const e = document.createElement(balise);
+  if (classe) e.className = classe;
+  if (texte !== undefined) e.textContent = texte;
+  return e;
+}
+function bouton(texte, classe, action) {
+  const b = el('button', classe, texte);
+  b.type = 'button';
+  b.disabled = occupe;
+  b.addEventListener('click', action);
+  return b;
+}
+
+function carte(sem, index) {
+  const li = el('li', 'semaine' + (index === 0 ? ' courante' : ''));
+  const tete = el('div', 'tete');
+  tete.append(el('span', 'dates', libelle(sem.lundi)));
+  if (index === 0) tete.append(el('span', 'badge', 'Cette semaine'));
+  li.append(tete);
+
+  if (sem.nom && !ouvertes.has(sem.lundi)) {
+    const ligne = el('div', 'inscrit');
+    ligne.append(el('span', 'nom', sem.nom));
+    const changer = bouton('Changer', 'discret', () => { ouvertes.add(sem.lundi); rendre(); });
+    changer.setAttribute('aria-label', 'Changer la personne pour la semaine ' + libelle(sem.lundi));
+    ligne.append(changer);
+    li.append(ligne);
+    return li;
+  }
+
+  const choix = el('div', 'choix');
+  choix.setAttribute('role', 'group');
+  choix.setAttribute('aria-label', 'Qui veille la semaine ' + libelle(sem.lundi) + ' ?');
+  etat.noms.forEach(nom => {
+    const b = bouton(nom, 'prenom' + (nom === sem.nom ? ' actif' : ''), () => inscrire(sem, nom));
+    if (nom === sem.nom) b.setAttribute('aria-pressed', 'true');
+    choix.append(b);
+  });
+  li.append(choix);
+
+  if (sem.nom) {
+    const apres = el('div', 'apres-choix');
+    apres.append(bouton('Personne', 'discret', () => inscrire(sem, null)));
+    apres.append(bouton('Annuler', 'discret', () => { ouvertes.delete(sem.lundi); rendre(); }));
+    li.append(apres);
+  }
+  return li;
+}
+
+function rendre() {
+  const contenu = document.getElementById('contenu');
+  contenu.textContent = '';
+
+  const liste = el('ul');
+  etat.semaines.forEach((sem, i) => liste.append(carte(sem, i)));
+  contenu.append(liste);
+
+  const details = el('details');
+  details.open = historiqueOuvert;
+  details.addEventListener('toggle', () => { historiqueOuvert = details.open; });
+  details.append(el('summary', '', 'Historique'));
+  if (etat.historique.length) {
+    const passe = el('ul', 'historique');
+    etat.historique.forEach(h => {
+      const li = el('li');
+      li.append(el('span', 'dates', libelle(h.lundi)), el('span', '', h.nom));
+      passe.append(li);
+    });
+    details.append(passe);
+  } else {
+    details.append(el('p', 'vide', 'Rien encore : l\'histoire commence cette semaine.'));
+  }
+  contenu.append(details);
+}
+
+let minuterie;
+function dire(texte) {
+  const annonce = document.getElementById('annonce');
+  annonce.textContent = texte;
+  annonce.classList.add('visible');
+  clearTimeout(minuterie);
+  minuterie = setTimeout(() => annonce.classList.remove('visible'), 4000);
+}
+
+/* ---------- Actions ---------- */
+async function inscrire(sem, nom) {
+  ouvertes.delete(sem.lundi);
+  if (nom === sem.nom) { rendre(); return; }
+
+  const avant = sem.nom;
+  sem.nom = nom;          // on affiche tout de suite, on confirme ensuite
+  occupe = true;
+  rendre();
+  try {
+    const reponse = await api({ action: 'inscrire', lundi: sem.lundi, nom: nom, attendu: avant });
+    etat = reponse;
+    if (reponse.conflit) dire('Quelqu\'un a modifié cette semaine entre-temps. La page est à jour.');
+    else dire(nom ? nom + ' veille, ' + libelle(sem.lundi) + '.' : 'Semaine libérée.');
+  } catch (erreur) {
+    sem.nom = avant;
+    dire('Pas enregistré (' + erreur.message + '). Réessaie dans un instant.');
+  }
+  occupe = false;
+  rendre();
+}
+
+async function charger(silencieux) {
+  try {
+    etat = await api();
+    rendre();
+  } catch (erreur) {
+    if (silencieux && etat) return;
+    const contenu = document.getElementById('contenu');
+    contenu.textContent = '';
+    contenu.append(el('p', 'erreur', 'Impossible de charger le planning (' + erreur.message + ').'));
+    const encore = el('button', '', 'Réessayer');
+    encore.type = 'button';
+    encore.addEventListener('click', () => charger(false));
+    contenu.append(encore);
+  }
+}
+
+document.getElementById('demo').hidden = !DEMO;
+charger(false);
+// Un onglet resté ouvert se rafraîchit quand on y revient.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !occupe && ouvertes.size === 0) charger(true);
+});
+</script>
+</body>
+</html>
